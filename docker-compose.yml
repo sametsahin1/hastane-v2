@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: hastane-mongo
+    # Host'ta 27018'e map'liyoruz, sadece istersen kontrol/test amaçlı
+    ports:
+      - "27018:27017"
+    environment:
+      - VITE_API_URL=https://yazilimservisi.com/
+    volumes:
+      - mongodb_data:/data/db  # Veritabanı verilerini kalıcı hale getir
+    networks:
+      - app-network
+
+  backend:
+    container_name: hastane-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    environment:
+      # DİKKAT: Mongo'ya "mongo" servisi üzerinden, 27017 portundan bağlanacağız.
+      # 'hastane_sistemi' de senin veritabanının ismi.
+      MONGO_URI: "mongodb://mongo:27017/hastane_sistemi"
+      JWT_SECRET: "your-secret-key"
+    networks:
+      - app-network
+
+  frontend:
+    container_name: hastane-frontend
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - VITE_API_URL=https://yazilimservisi.com
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:  # Volume tanımı ekle

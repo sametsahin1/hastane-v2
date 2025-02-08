@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: hastane-mongo-dev
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data_dev:/data/db
+    networks:
+      - app-network-dev
+
+  backend:
+    container_name: hastane-backend-dev
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: "mongodb://mongo:27017/hastane_sistemi_dev"
+      JWT_SECRET: "dev-secret-key"
+      NODE_ENV: "development"
+    networks:
+      - app-network-dev
+    command: npm run dev
+
+  frontend:
+    container_name: hastane-frontend-dev
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./admin-panel:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - backend
+    networks:
+      - app-network-dev
+    command: npm run dev -- --host 0.0.0.0
+
+networks:
+  app-network-dev:
+    driver: bridge
+
+volumes:
+  mongodb_data_dev: 

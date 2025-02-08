@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome/index';
+import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
 
 function PlaylistsPage() {
   const [playlists, setPlaylists] = useState([]);
@@ -10,6 +13,8 @@ function PlaylistsPage() {
   const [error, setError] = useState(null);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaDurations, setMediaDurations] = useState({});
+  const [editingPlaylist, setEditingPlaylist] = useState(null);
+  const [editedMediaItems, setEditedMediaItems] = useState([]);
 
   useEffect(() => {
     fetchPlaylists();
@@ -119,21 +124,29 @@ function PlaylistsPage() {
     });
   };
 
-  const handleDurationChange = (mediaId, duration) => {
-    // Update durations state
-    setMediaDurations(prev => ({
-      ...prev,
-      [mediaId]: parseInt(duration) || 5
-    }));
-    
-    // Update selected medias with new duration
-    setSelectedMedias(prev => 
-      prev.map(item => 
-        item.media === mediaId 
-          ? { ...item, duration: parseInt(duration) || 5 }
+  const handleDurationChange = (mediaItemId, newDuration) => {
+    setEditedMediaItems(items =>
+      items.map(item =>
+        item._id === mediaItemId
+          ? { ...item, duration: parseInt(newDuration) || 5 }
           : item
       )
     );
+  };
+
+  const handleAddMediaToPlaylist = (mediaId) => {
+    const mediaToAdd = medias.find(m => m._id === mediaId);
+    if (!mediaToAdd) return;
+
+    // Yeni medya eklerken mevcut medya nesnesini kullan
+    setEditedMediaItems(items => [
+      ...items,
+      {
+        _id: Date.now(), // Frontend için unique ID
+        media: mediaToAdd, // Mevcut medya nesnesini kullan (yeni upload yapmadan)
+        duration: 5 // Varsayılan süre
+      }
+    ]);
   };
 
   const handleCreatePlaylist = async () => {
@@ -176,6 +189,52 @@ function PlaylistsPage() {
       });
       alert('Playlist silinirken hata oluştu: ' + (error.response?.data?.message || error.message));
     }
+  };
+
+  const handleEditClick = (playlist) => {
+    setEditingPlaylist(playlist);
+    setEditedMediaItems(playlist.mediaItems);
+  };
+
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+
+    // Eğer aynı yere bırakıldıysa işlem yapma
+    if (sourceIndex === destinationIndex) return;
+
+    const newItems = Array.from(editedMediaItems);
+    const [removed] = newItems.splice(sourceIndex, 1);
+    newItems.splice(destinationIndex, 0, removed);
+
+    setEditedMediaItems(newItems);
+  };
+
+  const handleSavePlaylist = async () => {
+    try {
+      // Backend'e gönderirken sadece gerekli bilgileri gönder
+      const mediaItemsToSave = editedMediaItems.map(item => ({
+        media: item.media._id, // Sadece medya ID'sini gönder
+        duration: item.duration
+      }));
+
+      await api.put(`/api/playlists/${editingPlaylist._id}`, {
+        mediaItems: mediaItemsToSave
+      });
+      
+      setEditingPlaylist(null);
+      setEditedMediaItems([]);
+      fetchPlaylists();
+    } catch (error) {
+      console.error('Playlist güncelleme hatası:', error);
+      alert('Playlist güncellenirken hata oluştu');
+    }
+  };
+
+  const handleDeleteMediaItem = (mediaItemId) => {
+    setEditedMediaItems(items => items.filter(item => item._id !== mediaItemId));
   };
 
   // Medya dosyasının yolunu düzenleyen yardımcı fonksiyon
@@ -241,12 +300,20 @@ function PlaylistsPage() {
       <div key={playlist._id} style={styles.playlistItem}>
         <div style={styles.playlistHeader}>
           <h4>{playlist.name}</h4>
-          <button
-            onClick={() => handleDeletePlaylist(playlist._id)}
-            style={styles.deleteButton}
-          >
-            Sil
-          </button>
+          <div style={styles.headerButtons}>
+            <button
+              onClick={() => handleEditClick(playlist)}
+              style={styles.editButton}
+            >
+              Düzenle
+            </button>
+            <button
+              onClick={() => handleDeletePlaylist(playlist._id)}
+              style={styles.deleteButton}
+            >
+              Sil
+            </button>
+          </div>
         </div>
         <table style={styles.mediaTable}>
           <thead>
@@ -354,6 +421,134 @@ function PlaylistsPage() {
     );
   };
 
+  const renderEditablePlaylist = () => {
+    if (!editingPlaylist) return null;
+
+    return (
+      <div className="edit-playlist-container">
+        <div className="edit-playlist-header">
+          <h3>Playlist Düzenleme: {editingPlaylist.name}</h3>
+        </div>
+        
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="playlist-items" type="PLAYLIST_ITEM">
+            {(provided) => (
+              <div
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                style={{ minHeight: '100px' }}
+              >
+                {editedMediaItems.map((mediaItem, index) => {
+                  const dragId = mediaItem._id.toString();
+                  return (
+                    <Draggable
+                      key={dragId}
+                      draggableId={dragId}
+                      index={index}
+                    >
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className="draggable-media-item"
+                          style={{
+                            ...provided.draggableProps.style,
+                            opacity: snapshot.isDragging ? 0.8 : 1
+                          }}
+                        >
+                          <div className="media-preview">
+                            {mediaItem.media.mediaType === 'Video' ? (
+                              <video
+                                src={getMediaUrl(mediaItem.media.filePath)}
+                                controls
+                              />
+                            ) : (
+                              <img
+                                src={getMediaUrl(mediaItem.media.filePath)}
+                                alt={mediaItem.media.name}
+                              />
+                            )}
+                          </div>
+                          <div className="media-details">
+                            <div className="media-info">
+                              <div className="media-name">{mediaItem.media.name}</div>
+                              <div className="media-duration">
+                                <span>Süre:</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={mediaItem.duration}
+                                  onChange={(e) => handleDurationChange(mediaItem._id, e.target.value)}
+                                  className="duration-input"
+                                />
+                                <span>saniye</span>
+                              </div>
+                            </div>
+                            <div className="media-actions">
+                              <button
+                                onClick={() => handleDeleteMediaItem(mediaItem._id)}
+                                className="delete-media-btn"
+                              >
+                                <FontAwesomeIcon icon={faTrash} />
+                                Sil
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+
+        <div className="add-media-section">
+          <h4>Medya Ekle</h4>
+          <div className="media-grid">
+            {medias.map(media => (
+              <div
+                key={media._id}
+                className="media-grid-item"
+                onClick={() => handleAddMediaToPlaylist(media._id)}
+              >
+                {media.mediaType === 'Video' ? (
+                  <video
+                    src={getMediaUrl(media.filePath)}
+                  />
+                ) : (
+                  <img
+                    src={getMediaUrl(media.filePath)}
+                    alt={media.name}
+                  />
+                )}
+                <div className="media-grid-item-name">{media.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="edit-actions">
+          <button
+            onClick={handleSavePlaylist}
+            className="save-button"
+          >
+            Değişiklikleri Kaydet
+          </button>
+          <button
+            onClick={() => setEditingPlaylist(null)}
+            className="cancel-button"
+          >
+            İptal
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ margin: '20px' }}>
       <h2>Playlist Yönetimi</h2>
@@ -387,20 +582,21 @@ function PlaylistsPage() {
         </button>
       </div>
 
-      <h3>Playlist Listesi</h3>
-      <div style={styles.playlistGrid}>
-        {!Array.isArray(playlists) ? (
-          <div style={{ textAlign: 'center', width: '100%', padding: '20px', color: 'red' }}>
-            Playlist listesi alınırken bir hata oluştu
-          </div>
-        ) : playlists.length === 0 ? (
-          <div style={{ textAlign: 'center', width: '100%', padding: '20px' }}>
-            {error ? 'Hata oluştu' : 'Henüz playlist bulunmuyor'}
-          </div>
-        ) : (
-          playlists.map((playlist) => renderPlaylistItem(playlist))
-        )}
-      </div>
+      {editingPlaylist ? renderEditablePlaylist() : (
+        <div style={styles.playlistGrid}>
+          {!Array.isArray(playlists) ? (
+            <div style={{ textAlign: 'center', width: '100%', padding: '20px', color: 'red' }}>
+              Playlist listesi alınırken bir hata oluştu
+            </div>
+          ) : playlists.length === 0 ? (
+            <div style={{ textAlign: 'center', width: '100%', padding: '20px' }}>
+              {error ? 'Hata oluştu' : 'Henüz playlist bulunmuyor'}
+            </div>
+          ) : (
+            playlists.map((playlist) => renderPlaylistItem(playlist))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -497,9 +693,9 @@ const styles = {
   deleteButton: {
     padding: 0,
     color: 'white',
-    height: '2em',
     width: '4em',    backgroundColor: '#dc3545',
     color: 'white',
+    fontWeight: 'bold',
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
@@ -548,6 +744,75 @@ const styles = {
     borderRadius: '4px',
     border: '1px solid #ddd',
     textAlign: 'center'
+  },
+  editContainer: {
+    padding: '20px',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    backgroundColor: '#fff',
+    marginTop: '20px'
+  },
+  editableMediaItem: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '10px',
+    margin: '5px 0',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    backgroundColor: '#fff',
+    cursor: 'move'
+  },
+  editButton: {
+    backgroundColor: '#28a745',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    marginRight: '10px',
+    cursor: 'pointer'
+  },
+  headerButtons: {
+    display: 'flex',
+    gap: '10px'
+  },
+  saveButton: {
+    padding: '10px 20px',
+    backgroundColor: '#28a745',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '16px'
+  },
+  cancelButton: {
+    padding: '10px 20px',
+    backgroundColor: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    marginLeft: '10px'
+  },
+  addMediaSection: {
+    marginTop: '20px',
+    padding: '20px',
+    border: '1px solid #ddd',
+    borderRadius: '4px'
+  },
+  addableMediaItem: {
+    padding: '10px',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    ':hover': {
+      backgroundColor: '#f8f9fa'
+    }
+  },
+  editActions: {
+    marginTop: '20px',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px'
   }
 };
 

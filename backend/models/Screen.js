@@ -6,10 +6,6 @@ const screenSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  location: {
-    type: String,
-    default: ''
-  },
   status: {
     type: String,
     enum: ['active', 'inactive'],

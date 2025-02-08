@@ -187,7 +187,7 @@ function AssignmentPage() {
                   <span style={styles.screenName}>{screen.name}</span>
                   {screen.currentPlaylist && (
                     <span style={styles.currentPlaylist}>
-                      Mevcut Playlist: {playlists.find(p => p._id === screen.currentPlaylist)?.name || 'Bulunamadı'}
+                      Mevcut Playlist: {playlists.find(p => p._id === screen.currentPlaylist._id)?.name || 'Bulunamadı'}
                     </span>
                   )}
                 </div>

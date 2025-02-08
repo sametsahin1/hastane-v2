@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mongo:
     image: mongo:latest
-    container_name: hastane-mongo-dev
+    container_name: hastane-mongo-dev-v2
     ports:
       - "27018:27017"
     volumes:
@@ -12,7 +12,7 @@ services:
       - app-network-dev
 
   backend:
-    container_name: hastane-backend-dev
+    container_name: hastane-backend-dev-v2
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
@@ -33,7 +33,7 @@ services:
     command: npm run dev
 
   frontend:
-    container_name: hastane-frontend-dev
+    container_name: hastane-frontend-dev-v2
     build:
       context: ./admin-panel
       dockerfile: Dockerfile.dev

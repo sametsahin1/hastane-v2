@@ -76,23 +76,26 @@ router.post('/:id/media', async (req, res) => {
 // Playlist'i güncelle
 router.put('/:id', async (req, res) => {
   try {
-    const playlist = await Playlist.findByIdAndUpdate(
+    const { mediaItems } = req.body;
+    
+    // Playlist'i güncelle
+    const updatedPlaylist = await Playlist.findByIdAndUpdate(
       req.params.id,
-      {
-        name: req.body.name,
-        mediaItems: req.body.mediaItems
-      },
+      { mediaItems },
       { new: true }
-    );
+    ).populate('mediaItems.media');
 
-    if (!playlist) {
+    if (!updatedPlaylist) {
       return res.status(404).json({ message: 'Playlist bulunamadı' });
     }
 
-    res.json(playlist);
+    res.json(updatedPlaylist);
   } catch (error) {
     console.error('Playlist güncelleme hatası:', error);
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ 
+      message: 'Playlist güncellenirken hata oluştu',
+      error: error.message 
+    });
   }
 });
 

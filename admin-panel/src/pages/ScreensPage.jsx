@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 
 function ScreensPage() {
   const [screenName, setScreenName] = useState('');
-  const [location, setLocation] = useState('');
   const [screens, setScreens] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -43,8 +42,8 @@ function ScreensPage() {
   };
 
   const addScreen = async () => {
-    if (!screenName || !location) {
-      setError('Ekran adı ve lokasyon zorunludur');
+    if (!screenName) {
+      setError('Ekran adı zorunludur');
       return;
     }
 
@@ -52,11 +51,9 @@ function ScreensPage() {
       setLoading(true);
       await api.post('/api/screens', {
         name: screenName,
-        location: location,
         status: 'active'
       });
       setScreenName('');
-      setLocation('');
       setError(null);
       fetchScreens();
     } catch (error) {
@@ -103,12 +100,6 @@ function ScreensPage() {
           value={screenName}
           onChange={(e) => setScreenName(e.target.value)}
         />
-        <input
-          className='input-screen-name'
-          placeholder="Lokasyon"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
         <button 
           className='input-screen-button' 
           onClick={addScreen}
@@ -123,7 +114,6 @@ function ScreensPage() {
         <thead>
           <tr>
             <th>Ad</th>
-            <th>Lokasyon</th>
             <th>Mevcut Playlist</th>
             <th>İşlemler</th>
             <th>Önizleme</th>
@@ -132,7 +122,7 @@ function ScreensPage() {
         <tbody>
           {!Array.isArray(screens) || screens.length === 0 ? (
             <tr>
-              <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>
+              <td colSpan="4" style={{ textAlign: 'center', padding: '20px' }}>
                 {error ? 'Hata oluştu' : 'Henüz ekran bulunmuyor'}
               </td>
             </tr>
@@ -140,7 +130,6 @@ function ScreensPage() {
             screens.map(screen => (
               <tr key={screen._id}>
                 <td>{screen.name}</td>
-                <td>{screen.location}</td>
                 <td>{screen.currentPlaylist ? screen.currentPlaylist.name : 'Atanmamış'}</td>
                 <td>
                   <button className='input-screen-buttonared'

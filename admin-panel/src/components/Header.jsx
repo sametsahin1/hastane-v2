@@ -18,7 +18,7 @@ function Header() {
   return (
     <header className="main-header">
       <div className="header-logo">
-        <a href="/">Hastane Ekran Yönetimi</a>
+        <a href="/">Ekran Yönetimi</a>
       </div>
 
       <nav className="header-nav">

@@ -4,6 +4,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const Media = require('../models/Media');
+const fs = require('fs');
 
 // CORS middleware
 router.use((req, res, next) => {
@@ -89,10 +90,34 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // Medya sil
 router.delete('/:id', async (req, res) => {
   try {
-    await Media.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Medya silindi' });
+    // Önce medyayı veritabanından bul
+    const media = await Media.findById(req.params.id);
+    
+    if (!media) {
+      return res.status(404).json({ message: 'Medya bulunamadı' });
+    }
+
+    // Dosya yolunu al ve uploads klasöründeki dosyayı sil
+    const filePath = path.join('/app', media.filePath);
+    
+    // Dosyayı fiziksel olarak sil
+    fs.unlink(filePath, async (err) => {
+      if (err) {
+        console.error('Dosya silinirken hata:', err);
+        // Dosya silinirken hata olsa bile veritabanından silmeye devam et
+      }
+      
+      // Medyayı veritabanından sil
+      await Media.findByIdAndDelete(req.params.id);
+      res.json({ message: 'Medya ve dosya başarıyla silindi' });
+    });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Silme hatası:', error);
+    res.status(500).json({ 
+      message: 'Medya silinirken hata oluştu',
+      error: error.message 
+    });
   }
 });
 
